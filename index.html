@@ -3,563 +3,235 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ruota della Fortuna - 28 Nomi Casuale</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-   7 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-8 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-9 <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Ruota Casuale</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            color: #333;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 10px;
+            font-size: 28px;
+            color: #222;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+        }
+        .controls {
+            width: 100%;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            resize: none;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        #btnUpdate {
+            background-color: #28a745;
+            margin-bottom: 10px;
+        }
+        #btnUpdate:hover {
+            background-color: #218838;
+        }
+        .wheel-outer {
+            position: relative;
+            width: 360px;
+            height: 360px;
+            margin-bottom: 20px;
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #dc3545;
+            z-index: 10;
+            filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.2));
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        #winner {
+            height: 40px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc3545;
+            text-align: center;
+            margin-top: 15px;
+        }
+    </style>
 </head>
 <body>
-    <script type="text/babel" data-presets="react">
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
 
-        function RouletteGame() {
-          // Input per i 28 nomi dei partecipanti
-          const [inputNames, setInputNames] = useState(Array(28).fill(''));
+    <div class="container">
+        <h1>Ruota della Fortuna</h1>
+        
+        <div class="controls">
+            <textarea id="optionsInput" placeholder="Inserisci le opzioni, una per riga...">Opzione 1
+Opzione 2
+Opzione 3
+Opzione 4
+Opzione 5
+Opzione 6</textarea>
+            <button id="btnUpdate">Aggiorna Opzioni</button>
+        </div>
 
-          const [gameStarted, setGameStarted] = useState(false);
-          const [namesList, setNamesList] = useState([]);
-          const [spinning, setSpinning] = useState(false);
-          const [rotation, setRotation] = useState(0);
-          const [currentName, setCurrentName] = useState(null);
-          const [eliminatedNames, setEliminatedNames] = useState([]);
-          const [gameOver, setGameOver] = useState(false);
-          const [showConfetti, setShowConfetti] = useState(false);
-          
-          const canvasRef = useRef(null);
-          const confettiRef = useRef(null);
+        <div class="wheel-outer">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="500" height="500"></canvas>
+        </div>
 
-          const handleNameChange = (index, value) => {
-            const newNames = [...inputNames];
-            newNames[index] = value;
-            setInputNames(newNames);
-          };
+        <button id="btnSpin">GIRA LA RUOTA!</button>
+        <div id="winner"></div>
+    </div>
 
-          const drawWheel = () => {
-            const canvas = canvasRef.current;
-            if (!canvas || namesList.length === 0) return;
-            
-            const ctx = canvas.getContext('2d');
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = 280;
-            
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const btnSpin = document.getElementById('btnSpin');
+        const btnUpdate = document.getElementById('btnUpdate');
+        const optionsInput = document.getElementById('optionsInput');
+        const winnerDisplay = document.getElementById('winner');
+
+        let options = [];
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        // Palette colori vividi per i segmenti
+        const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#26B99A', '#34495E', '#E74C3C', '#9B59B6'];
+
+        function drawWheel() {
+            options = optionsInput.value.split('\n').map(x => x.trim()).filter(x => x.length > 0);
+            if (options.length === 0) return;
+
+            const numSlices = options.length;
+            const sliceAngle = (2 * Math.PI) / numSlices;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            const anglePerSegment = (Math.PI * 2) / namesList.length;
-            
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 30;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-            
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius + 25, 0, Math.PI * 2);
-            ctx.strokeStyle = '#8B4513';
-            ctx.lineWidth = 12;
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius + 20, 0, Math.PI * 2);
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 10;
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius + 12, 0, Math.PI * 2);
-            ctx.strokeStyle = '#8B4513';
-            ctx.lineWidth = 6;
-            ctx.stroke();
-            
-            ctx.shadowBlur = 0;
-            
-            namesList.forEach((name, index) => {
-              const startAngle = index * anglePerSegment + (rotation * Math.PI / 180);
-              const endAngle = startAngle + anglePerSegment;
-              const isWinning = currentName === name;
-              
-              ctx.beginPath();
-              ctx.moveTo(centerX, centerY);
-              ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-              ctx.closePath();
-              
-              const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-              
-              if (isWinning) {
-                gradient.addColorStop(0, '#FFFF00');
-                gradient.addColorStop(0.5, '#FFD700');
-                gradient.addColorStop(1, '#FFA500');
-              } else if (index % 2 === 0) {
-                gradient.addColorStop(0, '#FF4444');
-                gradient.addColorStop(0.5, '#FF0000');
-                gradient.addColorStop(1, '#990000');
-              } else {
-                gradient.addColorStop(0, '#444444');
-                gradient.addColorStop(0.5, '#222222');
-                gradient.addColorStop(1, '#000000');
-              }
-              ctx.fillStyle = gradient;
-              ctx.fill();
-              
-              ctx.strokeStyle = isWinning ? '#FFFFFF' : '#FFD700';
-              ctx.lineWidth = isWinning ? 8 : 4;
-              ctx.stroke();
-              
-              ctx.save();
-              ctx.translate(centerX, centerY);
-              ctx.rotate(startAngle + anglePerSegment / 2);
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-              ctx.shadowBlur = 6;
-              ctx.shadowOffsetX = 3;
-              ctx.shadowOffsetY = 3;
-              
-              // Adatta font in base alla lunghezza del nome
-              const fontSize = name.length > 10 ? (isWinning ? '20px' : '14px') : (isWinning ? '30px' : '20px');
-              ctx.font = `bold ${fontSize} Arial`;
-              ctx.strokeStyle = '#000000';
-              ctx.lineWidth = 4;
-              
-              const displayName = name.length > 12 ? name.substring(0, 10) + '..' : name;
-              ctx.strokeText(displayName, radius * 0.65, 0);
-              
-              ctx.fillStyle = isWinning ? '#8B0000' : '#FFFFFF'; 
-              ctx.fillText(displayName, radius * 0.65, 0);
-              ctx.restore();
-            });
-            
-            if (currentName !== null) {
+
+            const radius = canvas.width / 2;
+
+            for (let i = 0; i < numSlices; i++) {
+                const angle = i * sliceAngle;
+                
+                // Disegna il segmento
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, 110, 0, Math.PI * 2);
-                
-                const winningCenterGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 110);
-                winningCenterGradient.addColorStop(0, '#FFFACD');
-                winningCenterGradient.addColorStop(0.5, '#FFD700');
-                winningCenterGradient.addColorStop(1, '#DAA520');
-                ctx.fillStyle = winningCenterGradient;
+                ctx.moveTo(radius, radius);
+                ctx.arc(radius, radius, radius, angle, angle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[i % colors.length];
                 ctx.fill();
-                
-                ctx.strokeStyle = '#8B4513';
-                ctx.lineWidth = 12;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
+                // Aggiunge il testo del segmento
                 ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                ctx.shadowColor = 'rgba(139, 0, 0, 0.8)';
-                ctx.shadowBlur = 15;
-                ctx.shadowOffsetX = 4;
-                ctx.shadowOffsetY = 4;
-                
-                const centerFontSize = currentName.length > 8 ? '36px' : '46px';
-                ctx.font = `bold ${centerFontSize} Arial`;
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 6;
-                ctx.strokeText(currentName, 0, 0);
-                
-                ctx.fillStyle = '#FF0000';
-                ctx.fillText(currentName, 0, 0);
+                ctx.translate(radius, radius);
+                ctx.rotate(angle + sliceAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px sans-serif';
+                ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+                ctx.shadowBlur = 4;
+                ctx.fillText(options[i], radius - 30, 8);
                 ctx.restore();
-                
-            } else {
-                const centerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 100);
-                centerGradient.addColorStop(0, '#FFD700');
-                centerGradient.addColorStop(0.5, '#FFA500');
-                centerGradient.addColorStop(0.8, '#FF8C00');
-                centerGradient.addColorStop(1, '#FF6347');
-                
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, 100, 0, Math.PI * 2);
-                ctx.fillStyle = centerGradient;
-                ctx.fill();
-                
-                ctx.strokeStyle = '#8B4513';
-                ctx.lineWidth = 8;
-                ctx.stroke();
-                
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                for (let i = 0; i < 12; i++) {
-                  ctx.save();
-                  ctx.rotate((i * Math.PI) / 6);
-                  
-                  const rayGradient = ctx.createLinearGradient(0, 0, 0, -80);
-                  rayGradient.addColorStop(0, '#8B4513');
-                  rayGradient.addColorStop(1, '#D2691E');
-                  
-                  ctx.strokeStyle = rayGradient;
-                  ctx.lineWidth = 6;
-                  ctx.beginPath();
-                  ctx.moveTo(0, 0);
-                  ctx.lineTo(0, -80);
-                  ctx.stroke();
-                  
-                  ctx.beginPath();
-                  ctx.arc(0, -75, 5, 0, Math.PI * 2);
-                  ctx.fillStyle = '#FFD700';
-                  ctx.fill();
-                  ctx.restore();
-                }
-                ctx.restore();
-                
-                const innerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 25);
-                innerGradient.addColorStop(0, '#FFD700');
-                innerGradient.addColorStop(1, '#B8860B');
-                
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, 25, 0, Math.PI * 2);
-                ctx.fillStyle = innerGradient;
-                ctx.fill();
-                ctx.strokeStyle = '#8B4513';
-                ctx.lineWidth = 4;
-                ctx.stroke();
             }
-
-            for (let i = 0; i < 16; i++) {
-              const angle = (i / 16) * Math.PI * 2;
-              const x = centerX + Math.cos(angle) * (radius + 18);
-              const y = centerY + Math.sin(angle) * (radius + 18);
-              
-              const gemGradient = ctx.createRadialGradient(x, y, 0, x, y, 8);
-              gemGradient.addColorStop(0, '#FFFF00');
-              gemGradient.addColorStop(0.5, '#FFD700');
-              gemGradient.addColorStop(1, '#FFA500');
-              
-              ctx.beginPath();
-              ctx.arc(x, y, 8, 0, Math.PI * 2);
-              ctx.fillStyle = gemGradient;
-              ctx.fill();
-              ctx.strokeStyle = '#8B4513';
-              ctx.lineWidth = 2;
-              ctx.stroke();
-            }
-
-            ctx.save();
-            ctx.translate(centerX, centerY);
-
-            const arrowLength = 70; 
-            const headLength = 25; 
-            const bodyLength = arrowLength - headLength; 
-            const arrowHeight = 30; 
-            const bodyHalfHeight = arrowHeight / 2 - 5; 
-            const headHalfHeight = 40 / 2;
-            const distanceFromWheel = radius + 30; 
-
-            const bodyGradient = ctx.createLinearGradient(distanceFromWheel + headLength, 0, distanceFromWheel + arrowLength, 0);
-            bodyGradient.addColorStop(0, '#A9A9A9'); 
-            bodyGradient.addColorStop(0.3, '#D3D3D3'); 
-            bodyGradient.addColorStop(0.7, '#D3D3D3');
-            bodyGradient.addColorStop(1, '#A9A9A9'); 
-
-            ctx.beginPath();
-            ctx.rect(distanceFromWheel + headLength, -bodyHalfHeight, bodyLength, bodyHalfHeight * 2); 
-            ctx.fillStyle = bodyGradient;
-            ctx.fill();
-            ctx.strokeStyle = '#555555'; 
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            const headGradient = ctx.createLinearGradient(distanceFromWheel, 0, distanceFromWheel + headLength, 0);
-            headGradient.addColorStop(0, '#DAA520'); 
-            headGradient.addColorStop(0.5, '#FFD700'); 
-            headGradient.addColorStop(1, '#B8860B'); 
-
-            ctx.beginPath();
-            ctx.moveTo(distanceFromWheel, 0); 
-            ctx.lineTo(distanceFromWheel + headLength, -headHalfHeight); 
-            ctx.lineTo(distanceFromWheel + headLength, headHalfHeight);
-            ctx.closePath();
-
-            ctx.fillStyle = headGradient;
-            ctx.fill();
-            ctx.strokeStyle = '#8B4513'; 
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            ctx.restore();
-          };
-
-          const drawConfetti = () => {
-            const canvas = confettiRef.current;
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            const confettiPieces = [];
-            const colors = ['#FFD700', '#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#FFA500', '#00FFFF'];
-            
-            for (let i = 0; i < 150; i++) {
-              confettiPieces.push({
-                x: Math.random() * canvas.width,
-                y: -20,
-                w: Math.random() * 10 + 5,
-                h: Math.random() * 15 + 5,
-                vx: (Math.random() - 0.5) * 4,
-                vy: Math.random() * 3 + 2,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                rotation: Math.random() * Math.PI * 2,
-                rotationSpeed: (Math.random() - 0.5) * 0.2
-              });
-            }
-            
-            let frame = 0;
-            const animate = () => {
-              if (frame > 180) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                setShowConfetti(false);
-                return;
-              }
-              
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              
-              confettiPieces.forEach(p => {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.rotation);
-                ctx.fillStyle = p.color;
-                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-                ctx.restore();
-                
-                p.x += p.vx;
-                p.y += p.vy;
-                p.rotation += p.rotationSpeed;
-                p.vy += 0.1;
-              });
-              
-              frame++;
-              requestAnimationFrame(animate);
-            };
-            
-            animate();
-          };
-
-          useEffect(() => {
-            if (gameStarted) {
-              drawWheel();
-            }
-          }, [namesList, rotation, currentName, gameStarted]);
-
-          useEffect(() => {
-            if (showConfetti) {
-              drawConfetti();
-            }
-          }, [showConfetti]);
-          const startGame = () => {
-            // Filtra e pulisce i nomi dai bianchi esterni
-            const cleanedNames = inputNames.map(n => n.trim()).filter(n => n !== '');
-
-            if (cleanedNames.length !== 28) {
-              alert('Inserisci tutti e 28 i nomi dei partecipanti per iniziare.');
-              return;
-            }
-
-            // Verifica duplicati nell'elenco principale
-            if (new Set(cleanedNames).size !== 28) {
-              alert('I 28 nomi devono essere tutti diversi tra loro.');
-              return;
-            }
-
-            setNamesList(cleanedNames);
-            setGameStarted(true);
-          };
-
-          const shuffleNames = () => {
-            if (spinning || currentName !== null) return; 
-            
-            setNamesList(prevNames => {
-                const shuffled = [...prevNames];
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                  const j = Math.floor(Math.random() * (i + 1));
-                  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                }
-                return shuffled;
-            });
-          };
-          const spinWheel = () => {
-            if (spinning || namesList.length === 0 || currentName !== null || gameOver) return; 
-            
-            setSpinning(true);
-            const currentList = namesList;
-            
-            // Estrazione totalmente casuale: nessun nome è protetto o preimpostato
-            const targetIndex = Math.floor(Math.random() * currentList.length);
-            const targetName = currentList[targetIndex];
-
-            const nextNamesList = currentList.filter(n => n !== targetName);
-            const nextEliminatedList = [...eliminatedNames, targetName];
-
-            const anglePerSegment = 360 / currentList.length; 
-            const segmentStartAngle = targetIndex * anglePerSegment;
-            const segmentCenterAngle = segmentStartAngle + (anglePerSegment / 2);
-            
-            let requiredRotation = 360 - segmentCenterAngle;
-            requiredRotation = ((requiredRotation % 360) + 360) % 360;
-            
-            const totalSpins = 5;
-            const targetAngleAnimation = (totalSpins * 360) + requiredRotation;
-            const finalRotationAngle = requiredRotation; 
-            
-            let start = null;
-            const duration = 3000;
-            
-            const animate = (timestamp) => {
-              if (!start) start = timestamp;
-              const progress = (timestamp - start) / duration;
-              
-              if (progress < 1) {
-                const easeOut = 1 - Math.pow(1 - progress, 4);
-                setRotation(targetAngleAnimation * easeOut); 
-                requestAnimationFrame(animate);
-              } else {
-                setRotation(finalRotationAngle); 
-                setCurrentName(targetName);
-                setShowConfetti(true);
-                setSpinning(false);
-                setNamesList(nextNamesList);
-                setEliminatedNames(nextEliminatedList);
-
-                if (nextNamesList.length === 1) {
-                  setGameOver(true);
-                }
-
-                setTimeout(() => {
-                  setCurrentName(null);
-                  setRotation(0);
-                }, 2000);
-              }
-            };
-            
-            requestAnimationFrame(animate);
-          };
-
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-amber-900 to-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-yellow-500 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-red-600 rounded-full blur-3xl animate-pulse delay-1000"></div>
-              </div>
-              
-              <canvas
-                ref={confettiRef}
-                width={window.innerWidth}
-                height={window.innerHeight}
-                className="absolute inset-0 pointer-events-none z-50"
-              />
-              
-              <div className="relative z-10 w-full max-w-7xl">
-                <div className="text-center mb-6">
-                  <h1 className="text-6xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-red-500 drop-shadow-2xl">
-                    🎰 RUOTA DELLA FORTUNA 🎰
-                  </h1>
-                </div>
-                
-                {!gameStarted ? (
-                  <div className="w-full mx-auto bg-gradient-to-br from-amber-900/90 to-red-900/90 backdrop-blur-xl p-8 rounded-3xl border-4 border-yellow-400 shadow-2xl">
-                    
-                    <h2 className="text-3xl text-yellow-300 mb-6 font-bold text-center">⚙️ Configurazione Postazioni</h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                      {inputNames.map((name, i) => (
-                        <div key={i} className="flex items-center gap-2 bg-black/40 p-2 rounded-xl border border-amber-500/40">
-                          <span className="text-yellow-400 font-bold w-6 text-right text-sm">{i+1}.</span>
-                          <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => handleNameChange(i, e.target.value)}
-                            placeholder={`Nome ${i+1}`}
-                            className="w-full px-3 py-1.5 text-base bg-black/70 text-white border border-yellow-400/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-300"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={startGame}
-                      className="w-full bg-gradient-to-r from-yellow-400 via-amber-500 to-red-600 text-white py-5 rounded-2xl font-bold text-2xl hover:from-yellow-500 hover:to-red-700 transition-all shadow-2xl border-2 border-yellow-300"
-                    >
-                      🎮 GENERA RUOTA E INIZIA
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col lg:flex-row justify-center gap-10 items-center lg:items-start">
-                    
-                    <div className="flex flex-col items-center">
-                      <div className="relative mb-6 p-6 bg-gradient-to-br from-amber-950/60 to-red-950/60 rounded-3xl shadow-2xl border-4 border-yellow-500 backdrop-blur-sm">
-                        <canvas
-                          ref={canvasRef}
-                          width={700}
-                          height={700}
-                          className="drop-shadow-2xl max-w-full h-auto"
-                        />
-                      </div>
-                      
-                      {currentName && (
-                        <div className="bg-gradient-to-r from-yellow-400 via-amber-500 to-red-600 px-12 py-6 rounded-3xl mb-8 shadow-2xl border-4 border-yellow-200 text-center">
-                          <p className="text-4xl font-bold text-white drop-shadow-2xl">🎉 ELIMINATO: {currentName} 🎉</p>
-                        </div>
-                      )}
-                      
-                      {!gameOver && (
-                        <div className="flex flex-col sm:flex-row items-center gap-6">
-                          <button
-                            onClick={shuffleNames}
-                            disabled={spinning || currentName !== null} 
-                            className={`bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-700 text-white px-10 py-5 rounded-2xl font-bold text-2xl transition-all shadow-2xl border-4 border-blue-300 ${
-                              spinning || currentName !== null ? 'opacity-50 cursor-not-allowed' : 'hover:from-blue-600 hover:to-indigo-800 hover:scale-105'
-                            }`}
-                          >
-                            🔀 MISCHIA PARTECIPANTI
-                          </button>
-                          <button
-                            onClick={spinWheel}
-                            disabled={spinning || currentName !== null} 
-                            className={`bg-gradient-to-r from-yellow-400 via-amber-500 to-red-600 text-white px-16 py-6 rounded-2xl font-bold text-3xl transition-all shadow-2xl border-4 border-yellow-200 ${
-                              spinning || currentName !== null ? 'opacity-50 cursor-not-allowed' : 'hover:from-yellow-500 hover:to-red-700 hover:scale-110 animate-pulse'
-                            }`}
-                          >
-                            {spinning ? '🎡 GIRANDO...' : '🎰 GIRA LA RUOTA'}
-                          </button>
-                        </div>
-                      )}
-                      
-                      {gameOver && (
-                        <div className="bg-gradient-to-r from-yellow-300 via-amber-400 to-red-500 p-10 rounded-3xl border-4 border-yellow-200 shadow-2xl text-center">
-                          <h2 className="text-5xl font-bold text-white mb-4 drop-shadow-2xl">🏆 GIOCO TERMINATO! 🏆</h2>
-                          <p className="text-3xl text-white drop-shadow-xl">Il Vincitore è: <span className="text-5xl font-bold text-yellow-100 block mt-2">{namesList[0]}</span></p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="w-full lg:w-96">
-                        <div className="bg-gradient-to-br from-black/80 to-amber-950/80 backdrop-blur-md p-6 rounded-3xl border-4 border-yellow-500 shadow-2xl sticky top-6">
-                            <h3 className="text-2xl text-yellow-300 mb-3 font-bold">📊 Nomi in Gara: {namesList.length} / 28</h3>
-                            <h3 className="text-2xl text-red-400 mb-4 font-bold">❌ Eliminati: {eliminatedNames.length}</h3>
-                            <div className="flex flex-wrap gap-2 justify-start max-h-[60vh] overflow-y-auto pr-2">
-                                {eliminatedNames.map((name, idx) => (
-                                <span key={idx} className="bg-gradient-to-br from-red-600 to-red-900 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-xl border border-red-400">
-                                    {name}
-                                </span>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                  </div>
-                )}
-              </div>
-            </div>
-          );
         }
 
-      const root = ReactDOM.createRoot(
-  document.getElementById('root')
-);
+        btnUpdate.addEventListener('click', () => {
+            if (isSpinning) return;
+            canvas.style.transition = 'none';
+            currentRotation = 0;
+            canvas.style.transform = `rotate(0deg)`;
+            winnerDisplay.textContent = '';
+            drawWheel();
+        });
 
-root.render(<RouletteGame />);
+        btnSpin.addEventListener('click', () => {
+            if (isSpinning || options.length === 0) return;
+            
+            isSpinning = true;
+            btnSpin.disabled = true;
+            btnUpdate.disabled = true;
+            winnerDisplay.textContent = '';
+
+            const extraSpins = 5; // Giri completi minimi prima di fermarsi
+            const randomDegrees = Math.floor(Math.random() * 360);
+            currentRotation += (extraSpins * 360) + randomDegrees;
+
+            // Transizione fluida CSS con effetto decelerazione (cubic-bezier)
+            canvas.style.transition = 'transform 4s cubic-bezier(0.1, 1, 0.1, 1)';
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            setTimeout(() => {
+                isSpinning = false;
+                btnSpin.disabled = false;
+                btnUpdate.disabled = false;
+
+                // Calcolo preciso del segmento sotto il puntatore (in alto a 270°)
+                const actualDegrees = currentRotation % 360;
+                const targetAngleDeg = (270 - actualDegrees + 360) % 360;
+                const sliceSizeDeg = 360 / options.length;
+                const winnerIndex = Math.floor(targetAngleDeg / sliceSizeDeg);
+
+                winnerDisplay.textContent = `🎉 Estratto: ${options[winnerIndex]}!`;
+            }, 4000);
+        });
+
+        // Inizializzazione iniziale
+        drawWheel();
     </script>
 </body>
 </html>
